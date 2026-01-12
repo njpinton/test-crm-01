@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Edit {{ object.title }}{% else %}New Deal{% endif %} - CRM System{% endblock %}
+{% block page_title %}{% if object %}Edit Deal{% else %}New Deal{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Basic Information -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Deal Information</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label for="id_title" class="block text-sm font-medium text-gray-700 mb-1">
+                        Deal Title <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.title }}
+                    {% if form.title.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.title.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div class="md:col-span-2">
+                    <label for="id_description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    {{ form.description }}
+                </div>
+                <div class="md:col-span-2">
+                    <label for="id_client" class="block text-sm font-medium text-gray-700 mb-1">
+                        Client <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.client }}
+                    {% if form.client.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.client.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-xs text-gray-500">
+                        <a href="{% url 'clients:create' %}" class="text-indigo-600 hover:text-indigo-800">+ Create new client</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Stage -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Pipeline Stage</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="id_stage" class="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                    {{ form.stage }}
+                </div>
+                <div>
+                    <label for="id_probability" class="block text-sm font-medium text-gray-700 mb-1">Probability (%)</label>
+                    {{ form.probability }}
+                </div>
+            </div>
+
+            <!-- Close reasons (shown conditionally via JS) -->
+            <div id="close-reason-fields" class="mt-4 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="closed-lost-reason-field" class="hidden">
+                        <label for="id_closed_lost_reason" class="block text-sm font-medium text-gray-700 mb-1">Lost Reason</label>
+                        {{ form.closed_lost_reason }}
+                    </div>
+                    <div id="declined-reason-field" class="hidden">
+                        <label for="id_declined_reason" class="block text-sm font-medium text-gray-700 mb-1">Declined Reason</label>
+                        {{ form.declined_reason }}
+                    </div>
+                    <div id="actual-value-field" class="hidden">
+                        <label for="id_actual_value" class="block text-sm font-medium text-gray-700 mb-1">Actual Value</label>
+                        {{ form.actual_value }}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="id_close_notes" class="block text-sm font-medium text-gray-700 mb-1">Close Notes</label>
+                        {{ form.close_notes }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financials -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Financials</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="id_estimated_value" class="block text-sm font-medium text-gray-700 mb-1">Estimated Value ($)</label>
+                    {{ form.estimated_value }}
+                </div>
+                <div>
+                    <label for="id_expected_close_date" class="block text-sm font-medium text-gray-700 mb-1">Expected Close Date</label>
+                    {{ form.expected_close_date }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Assignment -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Assignment</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="id_owner" class="block text-sm font-medium text-gray-700 mb-1">
+                        Owner <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.owner }}
+                    {% if form.owner.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.owner.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="id_estimator" class="block text-sm font-medium text-gray-700 mb-1">Estimator</label>
+                    {{ form.estimator }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3">
+            <a href="{% if object %}{% url 'pipeline:deal_detail' object.pk %}{% else %}{% url 'pipeline:kanban' %}{% endif %}"
+               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                {% if object %}Save Changes{% else %}Create Deal{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stageSelect = document.getElementById('id_stage');
+    const closeReasonFields = document.getElementById('close-reason-fields');
+    const closedLostField = document.getElementById('closed-lost-reason-field');
+    const declinedField = document.getElementById('declined-reason-field');
+    const actualValueField = document.getElementById('actual-value-field');
+
+    function updateCloseFields() {
+        const stage = stageSelect.value;
+
+        closeReasonFields.classList.add('hidden');
+        closedLostField.classList.add('hidden');
+        declinedField.classList.add('hidden');
+        actualValueField.classList.add('hidden');
+
+        if (stage === 'CLOSED_LOST') {
+            closeReasonFields.classList.remove('hidden');
+            closedLostField.classList.remove('hidden');
+        } else if (stage === 'DECLINED_TO_BID') {
+            closeReasonFields.classList.remove('hidden');
+            declinedField.classList.remove('hidden');
+        } else if (stage === 'CLOSED_WON') {
+            closeReasonFields.classList.remove('hidden');
+            actualValueField.classList.remove('hidden');
+        }
+    }
+
+    stageSelect.addEventListener('change', updateCloseFields);
+    updateCloseFields(); // Initial check
+});
+</script>
+{% endblock %}

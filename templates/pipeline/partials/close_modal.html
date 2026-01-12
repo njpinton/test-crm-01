@@ -1,0 +1,73 @@
+<div id="close-deal-form">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+        {% if new_stage == 'CLOSED_WON' %}
+        Close Deal as Won
+        {% elif new_stage == 'CLOSED_LOST' %}
+        Close Deal as Lost
+        {% else %}
+        Decline to Bid
+        {% endif %}
+    </h3>
+
+    <p class="text-sm text-gray-500 mb-4">
+        <strong>{{ deal.title }}</strong> - {{ deal.client.company_name }}
+    </p>
+
+    <form hx-post="{% url 'pipeline:close_deal' deal.pk %}"
+          hx-swap="none"
+          class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="stage" value="{{ new_stage }}">
+        <input type="hidden" name="source_stage" value="{{ source_stage }}">
+
+        {% if new_stage == 'CLOSED_WON' %}
+        <!-- Actual Value for Won Deals -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Final Value</label>
+            {{ form.actual_value }}
+            <p class="mt-1 text-xs text-gray-500">
+                Leave blank to use estimated value (${{ deal.estimated_value|floatformat:0 }})
+            </p>
+        </div>
+        {% elif new_stage == 'CLOSED_LOST' %}
+        <!-- Lost Reason -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Loss <span class="text-red-500">*</span></label>
+            {{ form.closed_lost_reason }}
+            {% if form.closed_lost_reason.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.closed_lost_reason.errors.0 }}</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <!-- Declined Reason -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Declining <span class="text-red-500">*</span></label>
+            {{ form.declined_reason }}
+            {% if form.declined_reason.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.declined_reason.errors.0 }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Notes -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+            {{ form.close_notes }}
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 pt-2">
+            <button type="button"
+                    @click="open = false"
+                    class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </button>
+            <button type="submit"
+                    class="flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg
+                        {% if new_stage == 'CLOSED_WON' %}bg-green-600 hover:bg-green-700
+                        {% else %}bg-red-600 hover:bg-red-700{% endif %}">
+                {% if new_stage == 'CLOSED_WON' %}Mark as Won{% else %}Close Deal{% endif %}
+            </button>
+        </div>
+    </form>
+</div>

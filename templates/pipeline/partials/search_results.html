@@ -1,0 +1,25 @@
+{% load humanize %}
+{% if deals %}
+<div class="bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+    {% for deal in deals %}
+    <a href="{% url 'pipeline:deal_detail' deal.pk %}"
+       class="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="font-medium text-gray-900">{{ deal.title }}</p>
+                <p class="text-sm text-gray-500">{{ deal.client.company_name }}</p>
+            </div>
+            <span class="px-2 py-0.5 text-xs font-medium rounded-full
+                {% if deal.stage == 'CLOSED_WON' %}bg-green-100 text-green-800
+                {% elif deal.stage == 'CLOSED_LOST' or deal.stage == 'DECLINED_TO_BID' %}bg-red-100 text-red-800
+                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                {{ deal.get_stage_display }}
+            </span>
+        </div>
+        {% if deal.estimated_value %}
+        <p class="text-xs text-gray-400 mt-1">${{ deal.estimated_value|floatformat:0|intcomma }}</p>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}

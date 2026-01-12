@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Edit {{ object.company_name }}{% else %}New Client{% endif %} - CRM System{% endblock %}
+{% block page_title %}{% if object %}Edit Client{% else %}New Client{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Company Information -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label for="id_company_name" class="block text-sm font-medium text-gray-700 mb-1">
+                        Company Name <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.company_name }}
+                    {% if form.company_name.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.company_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="id_industry" class="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                    {{ form.industry }}
+                </div>
+                <div>
+                    <label for="id_website" class="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                    {{ form.website }}
+                </div>
+                <div>
+                    <label for="id_status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    {{ form.status }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Primary Contact -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Primary Contact</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="id_contact_name" class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                    {{ form.contact_name }}
+                </div>
+                <div>
+                    <label for="id_contact_title" class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    {{ form.contact_title }}
+                </div>
+                <div>
+                    <label for="id_contact_email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    {{ form.contact_email }}
+                    {% if form.contact_email.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.contact_email.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="id_contact_phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    {{ form.contact_phone }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Address -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Address</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label for="id_address_line1" class="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                    {{ form.address_line1 }}
+                </div>
+                <div class="md:col-span-2">
+                    <label for="id_address_line2" class="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+                    {{ form.address_line2 }}
+                </div>
+                <div>
+                    <label for="id_city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    {{ form.city }}
+                </div>
+                <div>
+                    <label for="id_state" class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    {{ form.state }}
+                </div>
+                <div>
+                    <label for="id_postal_code" class="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                    {{ form.postal_code }}
+                </div>
+                <div>
+                    <label for="id_country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    {{ form.country }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
+            <div>
+                <label for="id_notes" class="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
+                {{ form.notes }}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3">
+            <a href="{% if object %}{% url 'clients:detail' object.pk %}{% else %}{% url 'clients:list' %}{% endif %}"
+               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                {% if object %}Save Changes{% else %}Create Client{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

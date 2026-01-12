@@ -1,0 +1,7 @@
+-r base.txt
+
+# Production monitoring and security
+sentry-sdk>=1.40.0
+
+# Production-grade caching
+django-redis>=5.4.0

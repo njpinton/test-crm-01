@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.company_name }} - CRM System{% endblock %}
+{% block page_title %}{{ client.company_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex justify-between items-start">
+        <div>
+            <div class="flex items-center gap-3">
+                <span class="px-2 py-1 text-xs font-medium rounded-full
+                    {% if client.status == 'ACTIVE' %}bg-green-100 text-green-800
+                    {% elif client.status == 'PROSPECT' %}bg-blue-100 text-blue-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ client.get_status_display }}
+                </span>
+                {% if client.industry %}
+                <span class="text-gray-500">{{ client.industry }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'pipeline:deal_create' %}?client={{ client.pk }}"
+               class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Deal
+            </a>
+            <a href="{% url 'clients:edit' client.pk %}"
+               class="inline-flex items-center px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50">
+                Edit
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Info -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Contact Information -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Primary Contact</h4>
+                        {% if client.contact_name %}
+                        <p class="text-gray-900">{{ client.contact_name }}</p>
+                        {% if client.contact_title %}
+                        <p class="text-sm text-gray-500">{{ client.contact_title }}</p>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-gray-400">No contact set</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Contact Details</h4>
+                        {% if client.contact_email %}
+                        <p>
+                            <a href="mailto:{{ client.contact_email }}" class="text-indigo-600 hover:text-indigo-800">
+                                {{ client.contact_email }}
+                            </a>
+                        </p>
+                        {% endif %}
+                        {% if client.contact_phone %}
+                        <p>
+                            <a href="tel:{{ client.contact_phone }}" class="text-gray-900">
+                                {{ client.contact_phone }}
+                            </a>
+                        </p>
+                        {% endif %}
+                        {% if not client.contact_email and not client.contact_phone %}
+                        <p class="text-gray-400">No contact details</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Address</h4>
+                        {% if client.full_address %}
+                        <p class="text-gray-900 whitespace-pre-line">{{ client.full_address }}</p>
+                        {% else %}
+                        <p class="text-gray-400">No address set</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Website</h4>
+                        {% if client.website %}
+                        <a href="{{ client.website }}" target="_blank" rel="noopener" class="text-indigo-600 hover:text-indigo-800">
+                            {{ client.website }}
+                        </a>
+                        {% else %}
+                        <p class="text-gray-400">No website</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Deals -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Recent Deals</h3>
+                    <a href="{% url 'pipeline:list' %}?client={{ client.pk }}" class="text-sm text-indigo-600 hover:text-indigo-800">
+                        View all
+                    </a>
+                </div>
+                {% if deals %}
+                <div class="space-y-3">
+                    {% for deal in deals %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                        <div>
+                            <a href="{% url 'pipeline:deal_detail' deal.pk %}" class="font-medium text-gray-900 hover:text-indigo-600">
+                                {{ deal.title }}
+                            </a>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="px-2 py-0.5 text-xs rounded-full
+                                    {% if deal.stage == 'CLOSED_WON' %}bg-green-100 text-green-800
+                                    {% elif deal.stage == 'CLOSED_LOST' or deal.stage == 'DECLINED_TO_BID' %}bg-red-100 text-red-800
+                                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                    {{ deal.get_stage_display }}
+                                </span>
+                                <span class="text-xs text-gray-500">{{ deal.created_at|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                        {% if deal.estimated_value %}
+                        <span class="font-medium text-gray-900">${{ deal.estimated_value|floatformat:0 }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-gray-500">
+                    <p>No deals yet</p>
+                    <a href="{% url 'pipeline:deal_create' %}?client={{ client.pk }}" class="mt-2 inline-block text-indigo-600 hover:text-indigo-800">
+                        Create the first deal
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Notes -->
+            {% if client.notes %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
+                <p class="text-gray-700 whitespace-pre-wrap">{{ client.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Stats -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+                <dl class="space-y-4">
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Total Deals</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ deal_stats.total_count|default:0 }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Pipeline Value</dt>
+                        <dd class="text-sm font-medium text-gray-900">
+                            {% if deal_stats.total_value %}
+                            ${{ deal_stats.total_value|floatformat:0 }}
+                            {% else %}
+                            $0
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Won Deals</dt>
+                        <dd class="text-sm font-medium text-green-600">{{ deal_stats.won_count|default:0 }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Won Value</dt>
+                        <dd class="text-sm font-medium text-green-600">
+                            {% if deal_stats.won_value %}
+                            ${{ deal_stats.won_value|floatformat:0 }}
+                            {% else %}
+                            $0
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Details -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Details</h3>
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-sm text-gray-500">Created</dt>
+                        <dd class="text-sm text-gray-900">{{ client.created_at|date:"M d, Y" }}</dd>
+                    </div>
+                    {% if client.created_by %}
+                    <div>
+                        <dt class="text-sm text-gray-500">Created By</dt>
+                        <dd class="text-sm text-gray-900">{{ client.created_by.get_full_name }}</dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-sm text-gray-500">Last Updated</dt>
+                        <dd class="text-sm text-gray-900">{{ client.updated_at|date:"M d, Y" }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="bg-white shadow rounded-lg p-6 border border-red-200">
+                <h3 class="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Deleting a client will fail if there are associated deals.
+                </p>
+                <a href="{% url 'clients:delete' client.pk %}"
+                   class="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                    Delete Client
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

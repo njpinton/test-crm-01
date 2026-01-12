@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Pipeline - CRM System{% endblock %}
+{% block page_title %}Pipeline{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kanban-column {
+        min-height: calc(100vh - 250px);
+    }
+    .deal-card.dragging {
+        opacity: 0.5;
+        transform: rotate(2deg);
+    }
+    .drop-zone-active {
+        background-color: rgba(99, 102, 241, 0.1);
+        border: 2px dashed #6366f1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="kanbanBoard()" class="h-full">
+    <!-- Header with view toggle and filters -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center space-x-4">
+            <div class="flex bg-gray-100 rounded-lg p-1">
+                <a href="{% url 'pipeline:kanban' %}"
+                   class="px-4 py-2 text-sm font-medium rounded-md bg-white shadow text-gray-700">
+                    Kanban
+                </a>
+                <a href="{% url 'pipeline:list' %}"
+                   class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                    List
+                </a>
+            </div>
+
+            <span class="text-sm text-gray-500">
+                Pipeline Value: <strong id="total-pipeline-value" class="text-gray-900">${{ total_pipeline_value|floatformat:0|intcomma }}</strong>
+            </span>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <!-- Search -->
+            <div class="relative" x-data="{ showResults: false }">
+                <input type="text"
+                       name="q"
+                       placeholder="Search deals..."
+                       hx-get="{% url 'pipeline:search' %}"
+                       hx-trigger="keyup changed delay:300ms"
+                       hx-target="#search-results"
+                       @focus="showResults = true"
+                       @click.away="showResults = false"
+                       class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <div id="search-results" x-show="showResults" class="absolute top-full left-0 right-0 mt-1 z-50"></div>
+            </div>
+
+            <!-- Add Deal button -->
+            <a href="{% url 'pipeline:deal_create' %}"
+               class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Deal
+            </a>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="flex gap-4 overflow-x-auto pb-4" style="min-height: calc(100vh - 250px);">
+        {% for stage_data in stages %}
+        <div class="kanban-column flex-shrink-0 w-72 bg-gray-100 rounded-lg p-3"
+             data-stage="{{ stage_data.stage.value }}"
+             @dragover.prevent="onDragOver($event)"
+             @dragleave="onDragLeave($event)"
+             @drop="onDrop($event, '{{ stage_data.stage.value }}')">
+
+            <!-- Column Header -->
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center">
+                    <h3 class="font-semibold text-gray-900 text-sm">{{ stage_data.stage.label }}</h3>
+                    <span id="count-{{ stage_data.stage.value }}" class="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-full">
+                        {{ stage_data.count }}
+                    </span>
+                </div>
+                <span id="value-{{ stage_data.stage.value }}" class="text-xs text-gray-500">{% if stage_data.total_value %}${{ stage_data.total_value|floatformat:0|intcomma }}{% endif %}</span>
+            </div>
+
+            <!-- Deal Cards -->
+            <div class="space-y-2 min-h-[100px]" id="stage-{{ stage_data.stage.value }}">
+                {% for deal in stage_data.deals %}
+                {% include "pipeline/partials/deal_card.html" %}
+                {% empty %}
+                <div class="text-center py-6 text-gray-400 text-sm">
+                    No deals
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Close Deal Modal -->
+<div id="close-modal"
+     x-data="{ open: false }"
+     @deal-close-modal.window="open = true; $refs.modalContent.innerHTML = $event.detail.html"
+     @keydown.escape.window="open = false"
+     x-show="open"
+     x-cloak
+     class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div x-show="open"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click="open = false"
+             class="fixed inset-0 bg-black bg-opacity-50"></div>
+
+        <div x-show="open"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             x-ref="modalContent"
+             class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <!-- Modal content will be injected here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function kanbanBoard() {
+    return {
+        draggedDealId: null,
+        sourceStage: null,
+        isDragging: false,
+
+        onDragStart(event, dealId, stage) {
+            this.draggedDealId = dealId;
+            this.sourceStage = stage;
+            this.isDragging = true;
+            event.target.classList.add('dragging', 'opacity-50');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', dealId);
+            event.dataTransfer.setData('source-stage', stage);
+        },
+
+        onDragEnd(event) {
+            event.target.classList.remove('dragging', 'opacity-50');
+            document.querySelectorAll('.drop-zone-active').forEach(el => {
+                el.classList.remove('drop-zone-active');
+            });
+            this.isDragging = false;
+        },
+
+        onDragOver(event) {
+            if (this.isDragging) {
+                event.currentTarget.classList.add('drop-zone-active');
+            }
+        },
+
+        onDragLeave(event) {
+            event.currentTarget.classList.remove('drop-zone-active');
+        },
+
+        onDrop(event, targetStage) {
+            event.currentTarget.classList.remove('drop-zone-active');
+            const dealId = event.dataTransfer.getData('text/plain');
+            const sourceStage = event.dataTransfer.getData('source-stage');
+
+            // Don't move if dropping in same stage
+            if (sourceStage === targetStage) {
+                return;
+            }
+
+            // Disable all card dragging during request to prevent race conditions
+            document.querySelectorAll('.deal-card').forEach(card => {
+                card.setAttribute('draggable', 'false');
+                card.style.cursor = 'wait';
+            });
+
+            // Let HTMX handle everything - OOB swaps will update counters and remove old card
+            htmx.ajax('POST', '{% url "pipeline:move_deal" %}', {
+                values: {
+                    deal_id: dealId,
+                    stage: targetStage,
+                    source_stage: sourceStage,
+                    csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                target: '#stage-' + targetStage,
+                swap: 'afterbegin'
+            });
+        }
+    }
+}
+
+// Re-enable dragging after HTMX swap completes
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    // Re-enable all card dragging
+    document.querySelectorAll('.deal-card').forEach(card => {
+        card.setAttribute('draggable', 'true');
+        card.style.cursor = 'move';
+    });
+
+    // Check if response is a modal (close reason form)
+    if (event.detail.target.id && event.detail.target.id.startsWith('stage-')) {
+        const response = event.detail.xhr.responseText;
+        if (response.includes('close-deal-form')) {
+            // Show modal with the response content
+            window.dispatchEvent(new CustomEvent('deal-close-modal', {
+                detail: { html: response }
+            }));
+            // Remove the injected content from stage column
+            event.detail.target.querySelector('[id^="close-deal-form"]')?.remove();
+        }
+    }
+});
+
+// Handle HTMX errors - re-enable dragging
+document.body.addEventListener('htmx:responseError', function(event) {
+    document.querySelectorAll('.deal-card').forEach(card => {
+        card.setAttribute('draggable', 'true');
+        card.style.cursor = 'move';
+    });
+    console.error('HTMX error:', event.detail.error);
+});
+
+// Handle deal closed event - refresh the page
+document.body.addEventListener('dealClosed', function() {
+    window.location.reload();
+});
+</script>
+{% endblock %}

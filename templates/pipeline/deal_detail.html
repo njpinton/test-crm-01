@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% load humanize pipeline_tags %}
+
+{% block title %}{{ deal.title }} - CRM System{% endblock %}
+{% block page_title %}Deal Details{% endblock %}
+
+{% block content %}
+<!-- Breadcrumbs -->
+{% include "components/breadcrumbs.html" with items=breadcrumbs %}
+
+<!-- Pipeline Workflow Progress -->
+{% include "components/pipeline_workflow.html" with current_stage=deal.stage %}
+
+<div class="space-y-6">
+    <!-- Header with actions -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ deal.title }}</h1>
+                <div class="flex items-center gap-3 mt-2">
+                    <span class="px-3 py-1 text-sm font-medium rounded-full
+                        {% if deal.stage == 'CLOSED_WON' %}bg-green-100 text-green-800
+                        {% elif deal.stage == 'CLOSED_LOST' or deal.stage == 'DECLINED_TO_BID' %}bg-red-100 text-red-800
+                        {% else %}bg-indigo-100 text-indigo-800{% endif %}">
+                        {{ deal.get_stage_display }}
+                    </span>
+                    <span class="text-gray-500">{{ deal.probability }}% probability</span>
+                </div>
+                <p class="text-gray-500 mt-2">
+                    Client:
+                    <a href="{% url 'clients:detail' deal.client.pk %}" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                        {{ deal.client.company_name }}
+                    </a>
+                </p>
+            </div>
+            <div class="flex gap-3">
+                {% if not deal.is_closed %}
+                <a href="{% url 'pipeline:deal_edit' deal.pk %}"
+                   class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit Deal
+                </a>
+                {% endif %}
+                <a href="{% url 'pipeline:kanban' %}"
+                   class="inline-flex items-center px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                    </svg>
+                    View Pipeline
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Description -->
+            {% if deal.description %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Description</h3>
+                <p class="text-gray-700 whitespace-pre-wrap">{{ deal.description }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Files -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Files & Attachments</h3>
+                </div>
+
+                <div id="file-list">
+                    {% include "pipeline/partials/file_list.html" with files=files deal=deal %}
+                </div>
+            </div>
+
+            <!-- Activity Timeline -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Activity Timeline</h3>
+                {% if activities %}
+                <div class="flow-root">
+                    <ul class="-mb-8">
+                        {% for activity in activities %}
+                        <li>
+                            <div class="relative pb-8">
+                                {% if not forloop.last %}
+                                <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                {% endif %}
+                                <div class="relative flex space-x-3">
+                                    <div>
+                                        <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white
+                                            {% if activity.activity_type == 'CREATED' %}bg-green-500
+                                            {% elif activity.activity_type == 'STAGE_CHANGED' %}bg-blue-500
+                                            {% elif activity.activity_type == 'FILE_ADDED' %}bg-indigo-500
+                                            {% elif activity.activity_type == 'FILE_REMOVED' %}bg-red-500
+                                            {% else %}bg-gray-400{% endif %}">
+                                            {% if activity.activity_type == 'CREATED' %}
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                            {% elif activity.activity_type == 'STAGE_CHANGED' %}
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                            </svg>
+                                            {% elif activity.activity_type == 'FILE_ADDED' %}
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                            </svg>
+                                            {% elif activity.activity_type == 'FILE_REMOVED' %}
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                            {% else %}
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                                        <div>
+                                            <p class="text-sm text-gray-900">{{ activity.description }}</p>
+                                            {% if activity.old_value and activity.new_value %}
+                                            <p class="text-xs text-gray-500 mt-1">
+                                                {{ activity.old_value|stage_label }} &rarr; {{ activity.new_value|stage_label }}
+                                            </p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                                            <p>{% if activity.user %}{{ activity.user.get_full_name }}{% else %}System{% endif %}</p>
+                                            <time datetime="{{ activity.created_at|date:'c' }}">{{ activity.created_at|date:"M d, g:i A" }}</time>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm">No activity recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Financials -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Financials</h3>
+                <dl class="space-y-4">
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Estimated Value</dt>
+                        <dd class="text-sm font-medium text-gray-900">
+                            {% if deal.estimated_value %}${{ deal.estimated_value|floatformat:0|intcomma }}{% else %}-{% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Weighted Value</dt>
+                        <dd class="text-sm font-medium text-gray-900">${{ deal.weighted_value|floatformat:0|intcomma }}</dd>
+                    </div>
+                    {% if deal.actual_value %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Actual Value</dt>
+                        <dd class="text-sm font-medium text-green-600">${{ deal.actual_value|floatformat:0|intcomma }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Probability</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ deal.probability }}%</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Key Dates -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Key Dates</h3>
+                <dl class="space-y-4">
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Created</dt>
+                        <dd class="text-sm text-gray-900">{{ deal.created_at|date:"M d, Y" }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Expected Close</dt>
+                        <dd class="text-sm text-gray-900">
+                            {% if deal.expected_close_date %}{{ deal.expected_close_date|date:"M d, Y" }}{% else %}-{% endif %}
+                        </dd>
+                    </div>
+                    {% if deal.actual_close_date %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Closed On</dt>
+                        <dd class="text-sm text-gray-900">{{ deal.actual_close_date|date:"M d, Y" }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Days in Stage</dt>
+                        <dd class="text-sm {% if deal.days_in_stage > 14 %}text-red-600 font-medium{% else %}text-gray-900{% endif %}">
+                            {{ deal.days_in_stage }} days
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Deal Age</dt>
+                        <dd class="text-sm text-gray-900">{{ deal.age_in_days }} days</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Assignment -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Team</h3>
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-sm text-gray-500">Owner</dt>
+                        <dd class="text-sm text-gray-900 mt-1 flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium">
+                                {{ deal.owner.first_name|first|upper }}{{ deal.owner.last_name|first|upper }}
+                            </div>
+                            {{ deal.owner.get_full_name }}
+                        </dd>
+                    </div>
+                    {% if deal.estimator %}
+                    <div>
+                        <dt class="text-sm text-gray-500">Estimator</dt>
+                        <dd class="text-sm text-gray-900 mt-1 flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-medium">
+                                {{ deal.estimator.first_name|first|upper }}{{ deal.estimator.last_name|first|upper }}
+                            </div>
+                            {{ deal.estimator.get_full_name }}
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if deal.created_by %}
+                    <div>
+                        <dt class="text-sm text-gray-500">Created By</dt>
+                        <dd class="text-sm text-gray-900 mt-1">{{ deal.created_by.get_full_name }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Close Notes (if closed) -->
+            {% if deal.is_closed %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Close Information</h3>
+                {% if deal.closed_lost_reason %}
+                <div class="mb-3">
+                    <span class="text-sm text-gray-500">Reason:</span>
+                    <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                        {{ deal.get_closed_lost_reason_display }}
+                    </span>
+                </div>
+                {% elif deal.declined_reason %}
+                <div class="mb-3">
+                    <span class="text-sm text-gray-500">Reason:</span>
+                    <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                        {{ deal.get_declined_reason_display }}
+                    </span>
+                </div>
+                {% endif %}
+                {% if deal.close_notes %}
+                <p class="text-sm text-gray-700">{{ deal.close_notes }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="bg-white shadow rounded-lg p-6 border border-red-200">
+                <h3 class="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>
+                <a href="{% url 'pipeline:deal_delete' deal.pk %}"
+                   class="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete Deal
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

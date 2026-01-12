@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ client.company_name }} - CRM System{% endblock %}
+{% block page_title %}Delete Client{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="text-center mb-6">
+            <div class="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">Delete Client</h2>
+            <p class="text-gray-500">
+                Are you sure you want to delete <strong>{{ client.company_name }}</strong>?
+            </p>
+        </div>
+
+        {% if deal_count > 0 %}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <svg class="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div>
+                    <p class="text-sm font-medium text-red-800">Cannot delete this client</p>
+                    <p class="text-sm text-red-700 mt-1">
+                        This client has {{ deal_count }} associated deal{{ deal_count|pluralize }}.
+                        You must delete or reassign all deals before deleting this client.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="post" class="flex gap-3">
+            {% csrf_token %}
+            <a href="{% url 'clients:detail' client.pk %}"
+               class="flex-1 text-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </a>
+            <button type="submit"
+                    {% if deal_count > 0 %}disabled{% endif %}
+                    class="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                Delete Client
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

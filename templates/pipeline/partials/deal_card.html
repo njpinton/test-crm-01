@@ -1,0 +1,62 @@
+{% load humanize %}
+<div id="deal-{{ deal.id }}"
+     class="deal-card bg-white rounded-lg shadow p-3 cursor-move hover:shadow-md transition-shadow"
+     draggable="true"
+     data-deal-id="{{ deal.id }}"
+     data-stage="{{ deal.stage }}"
+     @dragstart="onDragStart($event, '{{ deal.id }}', '{{ deal.stage }}')"
+     @dragend="onDragEnd($event)">
+
+    <div class="flex justify-between items-start mb-2">
+        <a href="{% url 'pipeline:deal_detail' deal.pk %}"
+           class="font-medium text-gray-900 hover:text-indigo-600 text-sm line-clamp-2 flex-1">
+            {{ deal.title }}
+        </a>
+    </div>
+
+    <div class="text-xs text-gray-500 mb-2">
+        <a href="{% url 'clients:detail' deal.client.pk %}" class="hover:text-indigo-600">
+            {{ deal.client.company_name }}
+        </a>
+    </div>
+
+    {% if deal.estimated_value %}
+    <div class="flex justify-between items-center text-xs mb-2">
+        <span class="text-gray-500">Value:</span>
+        <span class="font-semibold text-gray-900">${{ deal.estimated_value|floatformat:0|intcomma }}</span>
+    </div>
+    {% endif %}
+
+    <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <!-- Probability badge -->
+            <span class="px-1.5 py-0.5 text-xs rounded-full
+                {% if deal.probability >= 75 %}bg-green-100 text-green-800
+                {% elif deal.probability >= 50 %}bg-yellow-100 text-yellow-800
+                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                {{ deal.probability }}%
+            </span>
+
+            <!-- Days in stage warning -->
+            {% if deal.days_in_stage > 14 %}
+            <span class="text-red-500" title="In stage for {{ deal.days_in_stage }} days">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </span>
+            {% elif deal.days_in_stage > 7 %}
+            <span class="text-orange-500" title="In stage for {{ deal.days_in_stage }} days">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Owner avatar -->
+        <div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs"
+             title="{{ deal.owner.get_full_name }}">
+            {{ deal.owner.first_name|first|upper|default:"?" }}{{ deal.owner.last_name|first|upper }}
+        </div>
+    </div>
+</div>

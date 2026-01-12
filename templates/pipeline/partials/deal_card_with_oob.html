@@ -1,0 +1,21 @@
+{% load humanize %}
+{# Main deal card - this gets inserted into the target stage via normal HTMX swap #}
+{% include "pipeline/partials/deal_card.html" with deal=deal %}
+
+{# OOB swap: Remove card from source stage (if it exists there) #}
+{% if source_stage %}
+<template id="deal-{{ deal.id }}" hx-swap-oob="delete"></template>
+{% endif %}
+
+{# OOB swap: Update source stage counter #}
+{% if source_stage %}
+<span id="count-{{ source_stage }}" hx-swap-oob="innerHTML" class="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-full">{{ source_count }}</span>
+<span id="value-{{ source_stage }}" hx-swap-oob="innerHTML" class="text-xs text-gray-500">{% if source_value %}${{ source_value|floatformat:0|intcomma }}{% endif %}</span>
+{% endif %}
+
+{# OOB swap: Update target stage counter #}
+<span id="count-{{ target_stage }}" hx-swap-oob="innerHTML" class="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-full">{{ target_count }}</span>
+<span id="value-{{ target_stage }}" hx-swap-oob="innerHTML" class="text-xs text-gray-500">{% if target_value %}${{ target_value|floatformat:0|intcomma }}{% endif %}</span>
+
+{# OOB swap: Update total pipeline value #}
+<strong id="total-pipeline-value" hx-swap-oob="innerHTML" class="text-gray-900">${{ total_pipeline|floatformat:0|intcomma }}</strong>

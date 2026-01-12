@@ -1,0 +1,14 @@
+{% if clients %}
+<div class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+    {% for client in clients %}
+    <button type="button"
+            class="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+            onclick="selectClient('{{ client.pk }}', '{{ client.company_name|escapejs }}')">
+        <div class="font-medium text-gray-900">{{ client.company_name }}</div>
+        {% if client.contact_name %}
+        <div class="text-sm text-gray-500">{{ client.contact_name }}</div>
+        {% endif %}
+    </button>
+    {% endfor %}
+</div>
+{% endif %}
