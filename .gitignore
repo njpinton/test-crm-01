@@ -35,7 +35,6 @@ db.sqlite3
 db.sqlite3-journal
 /media/
 /staticfiles/
-/static/
 
 # Environment variables
 .env
@@ -68,6 +67,9 @@ service-account-key.json
 
 # Node
 node_modules/
+
+# Vercel
+.vercel/
 
 # Misc
 *.bak

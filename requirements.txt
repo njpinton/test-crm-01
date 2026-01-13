@@ -1,0 +1,26 @@
+# Core Django
+Django>=5.0,<5.1
+django-environ>=0.11.2
+
+# Database - use binary for Vercel compatibility
+psycopg2-binary>=2.9.9
+
+# Static files
+whitenoise[brotli]>=6.6.0
+
+# HTMX integration
+django-htmx>=1.17.3
+
+# File storage (GCP Cloud Storage)
+django-storages[google]>=1.14.2
+google-cloud-storage>=2.14.0
+
+# Email integrations
+django-gmailapi-backend>=0.3.0
+django-allauth[socialaccount]>=0.63.0
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+# Utilities
+python-dateutil>=2.8.2
+pytz>=2024.1
