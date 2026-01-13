@@ -11,12 +11,37 @@ class RunMigrationsView(View):
 
     def get(self, request):
         output = StringIO()
+        results = []
+
+        # First, try to show current migration status
+        try:
+            call_command('showmigrations', '--list', stdout=output, stderr=output)
+            results.append(f"Current migration status:\n{output.getvalue()}")
+            output.truncate(0)
+            output.seek(0)
+        except Exception as e:
+            results.append(f"Could not get migration status: {e}")
+
+        # Check if we need to fake certain migrations
+        fake_migrations = request.GET.get('fake')
+        if fake_migrations:
+            try:
+                app, migration = fake_migrations.rsplit('.', 1)
+                call_command('migrate', app, migration, '--fake', '--noinput', stdout=output, stderr=output)
+                results.append(f"Faked migration {fake_migrations}:\n{output.getvalue()}")
+                output.truncate(0)
+                output.seek(0)
+            except Exception as e:
+                results.append(f"Failed to fake migration: {e}")
+
+        # Try to run migrations
         try:
             call_command('migrate', '--noinput', stdout=output, stderr=output)
-            result = output.getvalue()
-            return HttpResponse(f"<pre>Migration output:\n\n{result}</pre>")
+            results.append(f"Migration output:\n{output.getvalue()}")
         except Exception as e:
-            return HttpResponse(f"<pre>Migration error:\n\n{str(e)}\n\nOutput:\n{output.getvalue()}</pre>")
+            results.append(f"Migration error: {str(e)}\n\nOutput:\n{output.getvalue()}")
+
+        return HttpResponse(f"<pre>{'<hr>'.join(results)}</pre>")
 
 
 class HomeView(LoginRequiredMixin, TemplateView):
