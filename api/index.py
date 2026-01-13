@@ -9,6 +9,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.vercel')
 
+# Run migrations on cold start
+def run_migrations():
+    """Run pending migrations on first request (cold start)."""
+    try:
+        from django.core.management import call_command
+        call_command('migrate', '--noinput', verbosity=0)
+    except Exception as e:
+        print(f"Migration warning: {e}")
+
+# Run migrations before initializing the app
+run_migrations()
+
 from django.core.wsgi import get_wsgi_application
 
 # Vercel Python runtime expects 'app' to be a WSGI application
