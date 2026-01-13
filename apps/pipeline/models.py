@@ -439,11 +439,17 @@ class DealSchedule(models.Model):
         OTHER = 'OTHER', 'Other'
 
     class Status(models.TextChoices):
+        NEW_REQUEST = 'NEW_REQUEST', 'New Request'
+        SITE_OFFICER_ASSIGNED = 'SITE_OFFICER_ASSIGNED', 'Site Officer Assigned'
         SCHEDULED = 'SCHEDULED', 'Scheduled'
         IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
         COMPLETED = 'COMPLETED', 'Completed'
         CANCELLED = 'CANCELLED', 'Cancelled'
-        RESCHEDULED = 'RESCHEDULED', 'Rescheduled'
+
+    # Statuses that are in the active pipeline
+    ACTIVE_STATUSES = ['NEW_REQUEST', 'SITE_OFFICER_ASSIGNED', 'SCHEDULED', 'IN_PROGRESS']
+    # Statuses that are considered closed/done
+    CLOSED_STATUSES = ['COMPLETED', 'CANCELLED']
 
     class RecurrencePattern(models.TextChoices):
         WEEKLY = 'WEEKLY', 'Weekly'
@@ -476,10 +482,14 @@ class DealSchedule(models.Model):
         help_text='Duration in hours'
     )
     status = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=Status.choices,
-        default=Status.SCHEDULED
+        default=Status.NEW_REQUEST,
+        db_index=True
     )
+
+    # Display order within status (for Schedule Kanban board)
+    position = models.PositiveIntegerField(default=0)
 
     # Assignment
     assigned_to = models.ForeignKey(
@@ -580,6 +590,27 @@ class DealSchedule(models.Model):
     def is_today(self):
         """Check if scheduled for today."""
         return self.scheduled_date == timezone.now().date()
+
+    @property
+    def is_active(self):
+        """Check if schedule is in an active status."""
+        return self.status in self.ACTIVE_STATUSES
+
+    @classmethod
+    def get_status_order(cls):
+        """Return ordered list of statuses for Kanban display."""
+        return [
+            cls.Status.NEW_REQUEST,
+            cls.Status.SITE_OFFICER_ASSIGNED,
+            cls.Status.SCHEDULED,
+            cls.Status.IN_PROGRESS,
+            cls.Status.COMPLETED,
+        ]
+
+    @classmethod
+    def get_active_statuses(cls):
+        """Return list of active statuses for filtering."""
+        return cls.ACTIVE_STATUSES
 
 
 class DealComment(models.Model):

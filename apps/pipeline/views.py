@@ -713,3 +713,159 @@ class DealCommentDeleteView(LoginRequiredMixin, DeleteView):
             })
 
         return JsonResponse({'success': True})
+
+
+# ============================================================
+# Schedule Kanban Views
+# ============================================================
+
+class ScheduleKanbanView(LoginRequiredMixin, TemplateView):
+    """Kanban board view for schedule pipeline."""
+    template_name = 'pipeline/schedule_kanban.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Fetch ALL schedules in a single query
+        all_schedules = list(DealSchedule.objects.select_related(
+            'deal', 'deal__client', 'assigned_to'
+        ).order_by('position', 'scheduled_date', 'scheduled_time'))
+
+        # Group schedules by status in Python
+        schedules_by_status = {}
+        for schedule in all_schedules:
+            if schedule.status not in schedules_by_status:
+                schedules_by_status[schedule.status] = []
+            schedules_by_status[schedule.status].append(schedule)
+
+        # Build statuses data (excluding CANCELLED from kanban columns)
+        statuses_data = []
+        total_active = 0
+
+        for status in DealSchedule.get_status_order():
+            status_schedules = schedules_by_status.get(status.value, [])
+            status_count = len(status_schedules)
+
+            # Track active schedule count
+            if status.value in DealSchedule.ACTIVE_STATUSES:
+                total_active += status_count
+
+            statuses_data.append({
+                'status': status,
+                'schedules': status_schedules,
+                'count': status_count,
+            })
+
+        context['statuses'] = statuses_data
+        context['total_active'] = total_active
+        context['cancelled_count'] = len(schedules_by_status.get('CANCELLED', []))
+
+        # Breadcrumbs
+        context['breadcrumbs'] = [
+            {'label': 'Pipeline', 'url': reverse_lazy('pipeline:kanban')},
+            {'label': 'Schedules', 'url': None},
+        ]
+
+        return context
+
+
+@method_decorator(require_POST, name='dispatch')
+class MoveScheduleView(LoginRequiredMixin, View):
+    """HTMX endpoint for drag-and-drop schedule status changes."""
+
+    def post(self, request):
+        schedule_id = request.POST.get('schedule_id')
+        new_status = request.POST.get('status')
+        source_status = request.POST.get('source_status')
+        position = request.POST.get('position', 0)
+
+        schedule = get_object_or_404(DealSchedule, pk=schedule_id)
+        old_status = schedule.status
+
+        # Validate status transition
+        if new_status == 'SITE_OFFICER_ASSIGNED' and not schedule.assigned_to:
+            # Need to assign a site officer - return assignment modal
+            from apps.accounts.models import User
+            context = {
+                'schedule': schedule,
+                'new_status': new_status,
+                'source_status': source_status,
+                'users': User.objects.filter(is_active=True)
+            }
+            return render(request, 'pipeline/partials/schedule_assign_modal.html', context)
+
+        schedule.status = new_status
+        schedule.position = int(position)
+
+        # Auto-set completed_at for COMPLETED status
+        if new_status == DealSchedule.Status.COMPLETED.value and not schedule.completed_at:
+            schedule.completed_at = timezone.now()
+
+        schedule.save()
+
+        # Log activity
+        DealActivity.objects.create(
+            deal=schedule.deal,
+            activity_type=DealActivity.ActivityType.EDITED,
+            description=f"Schedule '{schedule.title}' moved from {DealSchedule.Status(old_status).label} to {DealSchedule.Status(new_status).label}",
+            old_value=old_status,
+            new_value=new_status,
+            user=request.user
+        )
+
+        # Calculate updated counts for source and target statuses
+        source_count = DealSchedule.objects.filter(status=source_status).count() if source_status else 0
+        target_count = DealSchedule.objects.filter(status=new_status).count()
+
+        # Calculate total active schedules
+        total_active = DealSchedule.objects.filter(
+            status__in=DealSchedule.ACTIVE_STATUSES
+        ).count()
+
+        context = {
+            'schedule': schedule,
+            'source_status': source_status,
+            'source_count': source_count,
+            'target_status': new_status,
+            'target_count': target_count,
+            'total_active': total_active,
+        }
+
+        # Return updated card HTML with OOB swaps for counters
+        return render(request, 'pipeline/partials/schedule_card_with_oob.html', context)
+
+
+@method_decorator(require_POST, name='dispatch')
+class AssignScheduleView(LoginRequiredMixin, View):
+    """Handle assigning a site officer to a schedule and moving it to SITE_OFFICER_ASSIGNED."""
+
+    def post(self, request, pk):
+        schedule = get_object_or_404(DealSchedule, pk=pk)
+        user_id = request.POST.get('assigned_to')
+        source_status = request.POST.get('source_status')
+
+        if user_id:
+            from apps.accounts.models import User
+            schedule.assigned_to = get_object_or_404(User, pk=user_id)
+
+        old_status = schedule.status
+        schedule.status = DealSchedule.Status.SITE_OFFICER_ASSIGNED
+        schedule.save()
+
+        # Log activity
+        DealActivity.objects.create(
+            deal=schedule.deal,
+            activity_type=DealActivity.ActivityType.ASSIGNED,
+            description=f"Schedule '{schedule.title}' assigned to {schedule.assigned_to.get_full_name() if schedule.assigned_to else 'unassigned'}",
+            old_value=old_status,
+            new_value=schedule.status,
+            user=request.user
+        )
+
+        if request.htmx:
+            # Return trigger to refresh the kanban
+            response = HttpResponse()
+            response['HX-Trigger'] = json.dumps({'scheduleAssigned': str(schedule.pk)})
+            return response
+
+        return JsonResponse({'success': True})

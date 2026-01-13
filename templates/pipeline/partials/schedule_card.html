@@ -1,0 +1,85 @@
+{% load humanize %}
+<div id="schedule-{{ schedule.id }}"
+     class="schedule-card bg-white rounded-lg shadow p-3 cursor-move hover:shadow-md transition-shadow"
+     draggable="true"
+     data-schedule-id="{{ schedule.id }}"
+     data-status="{{ schedule.status }}"
+     @dragstart="onDragStart($event, '{{ schedule.id }}', '{{ schedule.status }}')"
+     @dragend="onDragEnd($event)">
+
+    <div class="flex justify-between items-start mb-2">
+        <a href="{% url 'pipeline:deal_detail' schedule.deal.pk %}"
+           class="font-medium text-gray-900 hover:text-indigo-600 text-sm line-clamp-2 flex-1">
+            {{ schedule.title }}
+        </a>
+        <!-- Urgency indicator -->
+        {% if schedule.is_past_due %}
+        <span class="ml-1 text-red-500" title="Past due">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+        </span>
+        {% elif schedule.is_today %}
+        <span class="ml-1 text-yellow-500" title="Today">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+            </svg>
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Event type badge -->
+    <div class="mb-2">
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+            {% if schedule.event_type == 'SITE_VISIT' %}bg-blue-100 text-blue-800
+            {% elif schedule.event_type == 'INSPECTION' %}bg-purple-100 text-purple-800
+            {% elif schedule.event_type == 'INSTALLATION' %}bg-green-100 text-green-800
+            {% elif schedule.event_type == 'MAINTENANCE' %}bg-yellow-100 text-yellow-800
+            {% elif schedule.event_type == 'REPAIR' %}bg-red-100 text-red-800
+            {% else %}bg-gray-100 text-gray-800{% endif %}">
+            {{ schedule.display_event_type }}
+        </span>
+    </div>
+
+    <!-- Client/Deal info -->
+    <div class="text-xs text-gray-500 mb-2">
+        <a href="{% url 'clients:detail' schedule.deal.client.pk %}" class="hover:text-indigo-600">
+            {{ schedule.deal.client.company_name }}
+        </a>
+    </div>
+
+    <!-- Date and time -->
+    <div class="flex items-center text-xs text-gray-600 mb-2">
+        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <span class="{% if schedule.is_past_due %}text-red-600 font-medium{% endif %}">
+            {{ schedule.scheduled_date|date:"M d, Y" }}
+            {% if schedule.scheduled_time %} at {{ schedule.scheduled_time|time:"g:i A" }}{% endif %}
+        </span>
+    </div>
+
+    <div class="flex justify-between items-center">
+        <!-- Duration -->
+        {% if schedule.duration_hours %}
+        <span class="text-xs text-gray-500">
+            {{ schedule.duration_hours }}h
+        </span>
+        {% endif %}
+
+        <!-- Assigned to -->
+        {% if schedule.assigned_to %}
+        <div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs"
+             title="{{ schedule.assigned_to.get_full_name }}">
+            {{ schedule.assigned_to.first_name|first|upper|default:"?" }}{{ schedule.assigned_to.last_name|first|upper }}
+        </div>
+        {% else %}
+        <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-gray-500 text-xs"
+             title="Unassigned">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+        </div>
+        {% endif %}
+    </div>
+</div>

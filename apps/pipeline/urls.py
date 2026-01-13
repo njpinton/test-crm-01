@@ -6,6 +6,7 @@ app_name = 'pipeline'
 urlpatterns = [
     # Main views
     path('', views.KanbanBoardView.as_view(), name='kanban'),
+    path('schedules/', views.ScheduleKanbanView.as_view(), name='schedule_kanban'),
     path('list/', views.DealListView.as_view(), name='list'),
 
     # Deal CRUD
@@ -18,6 +19,8 @@ urlpatterns = [
     path('htmx/move-deal/', views.MoveDealView.as_view(), name='move_deal'),
     path('htmx/close-deal/<uuid:pk>/', views.CloseDealView.as_view(), name='close_deal'),
     path('htmx/search/', views.DealSearchView.as_view(), name='search'),
+    path('htmx/move-schedule/', views.MoveScheduleView.as_view(), name='move_schedule'),
+    path('htmx/assign-schedule/<uuid:pk>/', views.AssignScheduleView.as_view(), name='assign_schedule'),
 
     # File management
     path('deals/<uuid:deal_pk>/files/', views.DealFileListView.as_view(), name='deal_files'),
