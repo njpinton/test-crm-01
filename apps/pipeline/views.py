@@ -27,29 +27,40 @@ class KanbanBoardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Get deals grouped by stage
-        stages_data = []
-        for stage in Deal.get_stage_order():
-            deals = Deal.objects.filter(stage=stage.value).select_related(
-                'client', 'owner'
-            ).order_by('position', '-created_at')
+        # Fetch ALL deals in a single query, grouped by stage
+        all_deals = list(Deal.objects.select_related(
+            'client', 'owner'
+        ).order_by('position', '-created_at'))
 
-            stage_total = deals.aggregate(
-                total=Sum('estimated_value'),
-                count=Count('id')
-            )
+        # Group deals by stage in Python (much faster than N queries)
+        deals_by_stage = {}
+        for deal in all_deals:
+            if deal.stage not in deals_by_stage:
+                deals_by_stage[deal.stage] = []
+            deals_by_stage[deal.stage].append(deal)
+
+        # Build stages data
+        stages_data = []
+        total_pipeline_value = 0
+
+        for stage in Deal.get_stage_order():
+            stage_deals = deals_by_stage.get(stage.value, [])
+            stage_total = sum(d.estimated_value or 0 for d in stage_deals)
+            stage_count = len(stage_deals)
+
+            # Track active pipeline value
+            if stage.value in Deal.ACTIVE_STAGES:
+                total_pipeline_value += stage_total
 
             stages_data.append({
                 'stage': stage,
-                'deals': deals,
-                'count': stage_total['count'] or 0,
-                'total_value': stage_total['total'] or 0,
+                'deals': stage_deals,
+                'count': stage_count,
+                'total_value': stage_total,
             })
 
         context['stages'] = stages_data
-        context['total_pipeline_value'] = Deal.objects.filter(
-            stage__in=Deal.ACTIVE_STAGES
-        ).aggregate(total=Sum('estimated_value'))['total'] or 0
+        context['total_pipeline_value'] = total_pipeline_value
 
         # Breadcrumbs
         context['breadcrumbs'] = [
