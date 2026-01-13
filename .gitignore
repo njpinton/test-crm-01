@@ -60,6 +60,7 @@ htmlcov/
 *.pem
 *.key
 *.crt
+!prod-ca-2021.crt
 
 # GCP
 credentials.json

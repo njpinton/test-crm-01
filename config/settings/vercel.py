@@ -65,10 +65,18 @@ else:
         }
     }
 
-# Connection pooling settings
+# Connection pooling and SSL settings for Supabase
 if 'default' in DATABASES and DATABASES['default'].get('ENGINE') != 'django.db.backends.sqlite3':
     DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
     DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+    # SSL configuration for Supabase
+    SSL_CERT_PATH = BASE_DIR / 'prod-ca-2021.crt'
+    if SSL_CERT_PATH.exists():
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'verify-full',
+            'sslrootcert': str(SSL_CERT_PATH),
+        }
 
 
 # Static files configuration for Vercel
