@@ -18,9 +18,10 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
-from apps.core.views import HomeView
+from apps.core.views import HomeView, RunMigrationsView
 
 urlpatterns = [
+    path('_run-migrations/', RunMigrationsView.as_view(), name='run_migrations'),
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('pipeline/', include('apps.pipeline.urls')),
