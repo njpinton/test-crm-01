@@ -123,6 +123,22 @@ class Deal(models.Model):
         related_name='estimated_deals',
         help_text='Assigned estimator'
     )
+    site_officer = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='site_officer_deals',
+        help_text='Field technician who visits the site'
+    )
+    project_manager = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='project_manager_deals',
+        help_text='Person overseeing the deal/project'
+    )
 
     # Display order within stage (for Kanban board)
     position = models.PositiveIntegerField(default=0)
@@ -405,3 +421,217 @@ class DealActivity(models.Model):
 
     def __str__(self):
         return f"{self.deal.title} - {self.get_activity_type_display()}"
+
+
+class DealSchedule(models.Model):
+    """
+    Scheduled events for deals - site visits, service appointments, inspections, etc.
+    Supports recurring events and detailed scheduling information.
+    """
+
+    class EventType(models.TextChoices):
+        SITE_VISIT = 'SITE_VISIT', 'Site Visit'
+        INSPECTION = 'INSPECTION', 'Inspection'
+        INSTALLATION = 'INSTALLATION', 'Installation'
+        MAINTENANCE = 'MAINTENANCE', 'Maintenance'
+        REPAIR = 'REPAIR', 'Repair'
+        FOLLOW_UP = 'FOLLOW_UP', 'Follow-up'
+        OTHER = 'OTHER', 'Other'
+
+    class Status(models.TextChoices):
+        SCHEDULED = 'SCHEDULED', 'Scheduled'
+        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+        COMPLETED = 'COMPLETED', 'Completed'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+        RESCHEDULED = 'RESCHEDULED', 'Rescheduled'
+
+    class RecurrencePattern(models.TextChoices):
+        WEEKLY = 'WEEKLY', 'Weekly'
+        BIWEEKLY = 'BIWEEKLY', 'Every 2 Weeks'
+        MONTHLY = 'MONTHLY', 'Monthly'
+        QUARTERLY = 'QUARTERLY', 'Quarterly'
+        SEMIANNUAL = 'SEMIANNUAL', 'Every 6 Months'
+        ANNUAL = 'ANNUAL', 'Annual'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='schedules')
+
+    # Event details
+    event_type = models.CharField(max_length=20, choices=EventType.choices)
+    custom_event_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Custom event type when "Other" is selected'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+
+    # Scheduling
+    scheduled_date = models.DateField()
+    scheduled_time = models.TimeField(null=True, blank=True)
+    duration_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        default=1.0,
+        help_text='Duration in hours'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SCHEDULED
+    )
+
+    # Assignment
+    assigned_to = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_schedules',
+        help_text='Person assigned to this event'
+    )
+
+    # Location details
+    location_notes = models.TextField(
+        blank=True,
+        help_text='Specific location within the property'
+    )
+    access_instructions = models.TextField(
+        blank=True,
+        help_text='Gate codes, parking info, contact on arrival, etc.'
+    )
+
+    # Equipment/preparation
+    equipment_needed = models.TextField(
+        blank=True,
+        help_text='Tools, parts, or equipment required for this visit'
+    )
+
+    # Recurring support
+    is_recurring = models.BooleanField(default=False)
+    recurrence_pattern = models.CharField(
+        max_length=20,
+        choices=RecurrencePattern.choices,
+        blank=True
+    )
+    recurrence_end_date = models.DateField(null=True, blank=True)
+    parent_schedule = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recurrence_instances',
+        help_text='Parent recurring schedule'
+    )
+
+    # Completion
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completion_notes = models.TextField(
+        blank=True,
+        help_text='Notes from completing this event'
+    )
+
+    # Audit
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_schedules'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'deal_schedules'
+        verbose_name = 'Deal Schedule'
+        verbose_name_plural = 'Deal Schedules'
+        ordering = ['scheduled_date', 'scheduled_time']
+        indexes = [
+            models.Index(fields=['deal', 'scheduled_date']),
+            models.Index(fields=['assigned_to', 'scheduled_date']),
+            models.Index(fields=['status']),
+            models.Index(fields=['scheduled_date']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.scheduled_date}"
+
+    def save(self, *args, **kwargs):
+        # Auto-set completed_at when marked as completed
+        if self.status == self.Status.COMPLETED and not self.completed_at:
+            self.completed_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    @property
+    def display_event_type(self):
+        """Return the event type for display, using custom if OTHER."""
+        if self.event_type == self.EventType.OTHER and self.custom_event_type:
+            return self.custom_event_type
+        return self.get_event_type_display()
+
+    @property
+    def is_past_due(self):
+        """Check if scheduled date has passed and not completed."""
+        if self.status in [self.Status.COMPLETED, self.Status.CANCELLED]:
+            return False
+        return self.scheduled_date < timezone.now().date()
+
+    @property
+    def is_today(self):
+        """Check if scheduled for today."""
+        return self.scheduled_date == timezone.now().date()
+
+
+class DealComment(models.Model):
+    """
+    Comments on deals - separate from activity log for better UX and threading support.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='comments')
+
+    content = models.TextField()
+
+    # Threading support for replies
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='replies'
+    )
+
+    # Audit
+    author = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='deal_comments'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_edited = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'deal_comments'
+        verbose_name = 'Deal Comment'
+        verbose_name_plural = 'Deal Comments'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['deal', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        return f"Comment by {self.author} on {self.deal.title}"
+
+    def save(self, *args, **kwargs):
+        # Mark as edited if content changed on update
+        if self.pk:
+            self.is_edited = True
+        super().save(*args, **kwargs)
+
+    @property
+    def is_reply(self):
+        """Check if this comment is a reply to another comment."""
+        return self.parent is not None

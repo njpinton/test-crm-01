@@ -106,6 +106,16 @@
                     {% endif %}
                 </div>
                 <div>
+                    <label for="id_project_manager" class="block text-sm font-medium text-gray-700 mb-1">Project Manager</label>
+                    {{ form.project_manager }}
+                    <p class="mt-1 text-xs text-gray-500">Person overseeing this deal/project</p>
+                </div>
+                <div>
+                    <label for="id_site_officer" class="block text-sm font-medium text-gray-700 mb-1">Site Officer</label>
+                    {{ form.site_officer }}
+                    <p class="mt-1 text-xs text-gray-500">Field technician who visits the site</p>
+                </div>
+                <div>
                     <label for="id_estimator" class="block text-sm font-medium text-gray-700 mb-1">Estimator</label>
                     {{ form.estimator }}
                 </div>

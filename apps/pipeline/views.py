@@ -12,8 +12,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.utils.decorators import method_decorator
 
-from .models import Deal, DealFile, DealActivity
-from .forms import DealForm, DealCloseForm, DealFileUploadForm
+from .models import Deal, DealFile, DealActivity, DealSchedule, DealComment
+from .forms import (
+    DealForm, DealCloseForm, DealFileUploadForm,
+    DealScheduleForm, DealScheduleCompleteForm, DealCommentForm
+)
 from apps.clients.models import Client
 
 
@@ -108,6 +111,17 @@ class DealDetailView(LoginRequiredMixin, DetailView):
         context['files'] = self.object.files.filter(is_current=True)
         context['activities'] = self.object.activities.all()[:20]
         context['close_form'] = DealCloseForm(initial={'stage': self.object.stage})
+
+        # Schedules - upcoming and past
+        context['schedules'] = self.object.schedules.all()
+        context['upcoming_schedules'] = self.object.schedules.filter(
+            scheduled_date__gte=timezone.now().date()
+        ).exclude(status__in=['COMPLETED', 'CANCELLED'])[:5]
+        context['schedule_form'] = DealScheduleForm()
+
+        # Comments
+        context['comments'] = self.object.comments.filter(parent__isnull=True).select_related('author')
+        context['comment_form'] = DealCommentForm()
 
         # Breadcrumbs
         context['breadcrumbs'] = [
@@ -418,3 +432,273 @@ class DealSearchView(LoginRequiredMixin, ListView):
             Q(title__icontains=query) |
             Q(client__company_name__icontains=query)
         ).select_related('client', 'owner')[:10]
+
+
+# ============================================================
+# Schedule Views
+# ============================================================
+
+class DealScheduleListView(LoginRequiredMixin, ListView):
+    """List all schedules for a deal."""
+    model = DealSchedule
+    template_name = 'pipeline/partials/schedule_list.html'
+    context_object_name = 'schedules'
+
+    def get_queryset(self):
+        deal_pk = self.kwargs['deal_pk']
+        return DealSchedule.objects.filter(deal_id=deal_pk).select_related('assigned_to')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['deal'] = get_object_or_404(Deal, pk=self.kwargs['deal_pk'])
+        context['schedule_form'] = DealScheduleForm()
+        return context
+
+
+class DealScheduleCreateView(LoginRequiredMixin, CreateView):
+    """Create a new scheduled event for a deal."""
+    model = DealSchedule
+    form_class = DealScheduleForm
+    template_name = 'pipeline/partials/schedule_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['deal'] = get_object_or_404(Deal, pk=self.kwargs['deal_pk'])
+        context['is_edit'] = False
+        return context
+
+    def form_valid(self, form):
+        deal = get_object_or_404(Deal, pk=self.kwargs['deal_pk'])
+        form.instance.deal = deal
+        form.instance.created_by = self.request.user
+        response = super().form_valid(form)
+
+        DealActivity.objects.create(
+            deal=deal,
+            activity_type=DealActivity.ActivityType.EDITED,
+            description=f"Schedule added: {self.object.title} on {self.object.scheduled_date}",
+            user=self.request.user
+        )
+
+        if self.request.htmx:
+            schedules = deal.schedules.all()
+            return render(self.request, 'pipeline/partials/schedule_list.html', {
+                'schedules': schedules,
+                'deal': deal,
+                'schedule_form': DealScheduleForm()
+            })
+
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('pipeline:deal_detail', kwargs={'pk': self.kwargs['deal_pk']})
+
+
+class DealScheduleUpdateView(LoginRequiredMixin, UpdateView):
+    """Edit an existing scheduled event."""
+    model = DealSchedule
+    form_class = DealScheduleForm
+    template_name = 'pipeline/partials/schedule_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['deal'] = self.object.deal
+        context['is_edit'] = True
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        DealActivity.objects.create(
+            deal=self.object.deal,
+            activity_type=DealActivity.ActivityType.EDITED,
+            description=f"Schedule updated: {self.object.title}",
+            user=self.request.user
+        )
+
+        if self.request.htmx:
+            deal = self.object.deal
+            schedules = deal.schedules.all()
+            return render(self.request, 'pipeline/partials/schedule_list.html', {
+                'schedules': schedules,
+                'deal': deal,
+                'schedule_form': DealScheduleForm()
+            })
+
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('pipeline:deal_detail', kwargs={'pk': self.object.deal.pk})
+
+
+class DealScheduleDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete a scheduled event."""
+    model = DealSchedule
+
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        deal = self.object.deal
+        title = self.object.title
+
+        DealActivity.objects.create(
+            deal=deal,
+            activity_type=DealActivity.ActivityType.EDITED,
+            description=f"Schedule removed: {title}",
+            user=request.user
+        )
+
+        self.object.delete()
+
+        if request.htmx:
+            schedules = deal.schedules.all()
+            return render(request, 'pipeline/partials/schedule_list.html', {
+                'schedules': schedules,
+                'deal': deal,
+                'schedule_form': DealScheduleForm()
+            })
+
+        return JsonResponse({'success': True})
+
+
+@method_decorator(require_POST, name='dispatch')
+class DealScheduleCompleteView(LoginRequiredMixin, View):
+    """Mark a scheduled event as complete."""
+
+    def post(self, request, pk):
+        schedule = get_object_or_404(DealSchedule, pk=pk)
+        form = DealScheduleCompleteForm(request.POST)
+
+        if form.is_valid():
+            schedule.status = DealSchedule.Status.COMPLETED
+            schedule.completed_at = timezone.now()
+            schedule.completion_notes = form.cleaned_data.get('completion_notes', '')
+            schedule.save()
+
+            DealActivity.objects.create(
+                deal=schedule.deal,
+                activity_type=DealActivity.ActivityType.EDITED,
+                description=f"Schedule completed: {schedule.title}",
+                user=request.user
+            )
+
+            if request.htmx:
+                deal = schedule.deal
+                schedules = deal.schedules.all()
+                return render(request, 'pipeline/partials/schedule_list.html', {
+                    'schedules': schedules,
+                    'deal': deal,
+                    'schedule_form': DealScheduleForm()
+                })
+
+        return JsonResponse({'success': True})
+
+
+@method_decorator(require_POST, name='dispatch')
+class DealScheduleStatusUpdateView(LoginRequiredMixin, View):
+    """Update schedule status (e.g., mark as in progress, cancelled)."""
+
+    def post(self, request, pk):
+        schedule = get_object_or_404(DealSchedule, pk=pk)
+        new_status = request.POST.get('status')
+
+        if new_status in [s.value for s in DealSchedule.Status]:
+            old_status = schedule.status
+            schedule.status = new_status
+
+            if new_status == DealSchedule.Status.COMPLETED.value:
+                schedule.completed_at = timezone.now()
+
+            schedule.save()
+
+            DealActivity.objects.create(
+                deal=schedule.deal,
+                activity_type=DealActivity.ActivityType.EDITED,
+                description=f"Schedule status changed: {schedule.title} ({old_status} → {new_status})",
+                user=request.user
+            )
+
+            if request.htmx:
+                deal = schedule.deal
+                schedules = deal.schedules.all()
+                return render(request, 'pipeline/partials/schedule_list.html', {
+                    'schedules': schedules,
+                    'deal': deal,
+                    'schedule_form': DealScheduleForm()
+                })
+
+        return JsonResponse({'success': True})
+
+
+# ============================================================
+# Comment Views
+# ============================================================
+
+class DealCommentCreateView(LoginRequiredMixin, CreateView):
+    """Add a comment to a deal."""
+    model = DealComment
+    form_class = DealCommentForm
+    template_name = 'pipeline/partials/comment_form.html'
+
+    def form_valid(self, form):
+        deal = get_object_or_404(Deal, pk=self.kwargs['deal_pk'])
+        form.instance.deal = deal
+        form.instance.author = self.request.user
+
+        # Handle reply to another comment
+        parent_id = self.request.POST.get('parent_id')
+        if parent_id:
+            form.instance.parent = get_object_or_404(DealComment, pk=parent_id)
+
+        response = super().form_valid(form)
+
+        DealActivity.objects.create(
+            deal=deal,
+            activity_type=DealActivity.ActivityType.COMMENT,
+            description=f"Comment added by {self.request.user.get_full_name() or self.request.user.email}",
+            user=self.request.user
+        )
+
+        if self.request.htmx:
+            comments = deal.comments.filter(parent__isnull=True).select_related('author')
+            return render(self.request, 'pipeline/partials/comments_section.html', {
+                'comments': comments,
+                'deal': deal,
+                'comment_form': DealCommentForm()
+            })
+
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('pipeline:deal_detail', kwargs={'pk': self.kwargs['deal_pk']})
+
+
+class DealCommentDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete a comment (only author can delete)."""
+    model = DealComment
+
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        deal = self.object.deal
+
+        # Only allow author or admin to delete
+        if self.object.author != request.user and not request.user.is_staff:
+            return HttpResponse(status=403)
+
+        DealActivity.objects.create(
+            deal=deal,
+            activity_type=DealActivity.ActivityType.COMMENT,
+            description=f"Comment deleted by {request.user.get_full_name() or request.user.email}",
+            user=request.user
+        )
+
+        self.object.delete()
+
+        if request.htmx:
+            comments = deal.comments.filter(parent__isnull=True).select_related('author')
+            return render(request, 'pipeline/partials/comments_section.html', {
+                'comments': comments,
+                'deal': deal,
+                'comment_form': DealCommentForm()
+            })
+
+        return JsonResponse({'success': True})

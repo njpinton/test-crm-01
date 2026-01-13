@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Deal, DealFile
+from .models import Deal, DealFile, DealSchedule, DealComment
 
 User = get_user_model()
 
@@ -13,7 +13,7 @@ class DealForm(forms.ModelForm):
         fields = [
             'title', 'description', 'client', 'stage',
             'estimated_value', 'probability', 'expected_close_date',
-            'owner', 'estimator',
+            'owner', 'estimator', 'site_officer', 'project_manager',
             'closed_lost_reason', 'declined_reason', 'close_notes', 'actual_value'
         ]
         widgets = {
@@ -57,6 +57,12 @@ class DealForm(forms.ModelForm):
             'estimator': forms.Select(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'
             }),
+            'site_officer': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'
+            }),
+            'project_manager': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'
+            }),
             'closed_lost_reason': forms.Select(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'
             }),
@@ -72,10 +78,15 @@ class DealForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filter owner/estimator to active users
-        self.fields['owner'].queryset = User.objects.filter(is_active=True)
-        self.fields['estimator'].queryset = User.objects.filter(is_active=True)
+        # Filter all user fields to active users
+        active_users = User.objects.filter(is_active=True)
+        self.fields['owner'].queryset = active_users
+        self.fields['estimator'].queryset = active_users
         self.fields['estimator'].required = False
+        self.fields['site_officer'].queryset = active_users
+        self.fields['site_officer'].required = False
+        self.fields['project_manager'].queryset = active_users
+        self.fields['project_manager'].required = False
 
 
 class DealCloseForm(forms.Form):
@@ -166,3 +177,141 @@ class DealFileUploadForm(forms.ModelForm):
             if file.size > 10 * 1024 * 1024:
                 raise forms.ValidationError('File size must be less than 10MB.')
         return file
+
+
+class DealScheduleForm(forms.ModelForm):
+    """Form for creating and editing scheduled events for a deal."""
+
+    class Meta:
+        model = DealSchedule
+        fields = [
+            'event_type', 'custom_event_type', 'title', 'description',
+            'scheduled_date', 'scheduled_time', 'duration_hours',
+            'assigned_to', 'location_notes', 'access_instructions',
+            'equipment_needed', 'is_recurring', 'recurrence_pattern',
+            'recurrence_end_date'
+        ]
+        widgets = {
+            'event_type': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'x-model': 'eventType'
+            }),
+            'custom_event_type': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'placeholder': 'Enter custom event type',
+                'x-show': "eventType === 'OTHER'"
+            }),
+            'title': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'placeholder': 'Event Title'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'rows': 2,
+                'placeholder': 'Event description...'
+            }),
+            'scheduled_date': forms.DateInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'type': 'date'
+            }),
+            'scheduled_time': forms.TimeInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'type': 'time'
+            }),
+            'duration_hours': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'step': '0.5',
+                'min': '0.5',
+                'placeholder': '1.0'
+            }),
+            'assigned_to': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'
+            }),
+            'location_notes': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'rows': 2,
+                'placeholder': 'Specific location within the property...'
+            }),
+            'access_instructions': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'rows': 2,
+                'placeholder': 'Gate codes, parking, contact on arrival...'
+            }),
+            'equipment_needed': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'rows': 2,
+                'placeholder': 'Tools, parts, or equipment needed...'
+            }),
+            'is_recurring': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded',
+                'x-model': 'isRecurring'
+            }),
+            'recurrence_pattern': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'x-show': 'isRecurring'
+            }),
+            'recurrence_end_date': forms.DateInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'type': 'date',
+                'x-show': 'isRecurring'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['assigned_to'].queryset = User.objects.filter(is_active=True)
+        self.fields['assigned_to'].required = False
+        self.fields['custom_event_type'].required = False
+        self.fields['scheduled_time'].required = False
+        self.fields['description'].required = False
+        self.fields['location_notes'].required = False
+        self.fields['access_instructions'].required = False
+        self.fields['equipment_needed'].required = False
+        self.fields['recurrence_pattern'].required = False
+        self.fields['recurrence_end_date'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        event_type = cleaned_data.get('event_type')
+        custom_event_type = cleaned_data.get('custom_event_type')
+        is_recurring = cleaned_data.get('is_recurring')
+        recurrence_pattern = cleaned_data.get('recurrence_pattern')
+
+        if event_type == 'OTHER' and not custom_event_type:
+            self.add_error('custom_event_type', 'Please specify the custom event type.')
+
+        if is_recurring and not recurrence_pattern:
+            self.add_error('recurrence_pattern', 'Please select a recurrence pattern.')
+
+        return cleaned_data
+
+
+class DealScheduleCompleteForm(forms.Form):
+    """Form for marking a schedule as complete."""
+    completion_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+            'rows': 3,
+            'placeholder': 'Notes about the completed visit...'
+        })
+    )
+
+
+class DealCommentForm(forms.ModelForm):
+    """Form for adding comments to a deal."""
+
+    class Meta:
+        model = DealComment
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500',
+                'rows': 3,
+                'placeholder': 'Add a comment...'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['content'].required = True

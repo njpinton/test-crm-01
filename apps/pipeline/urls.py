@@ -23,4 +23,16 @@ urlpatterns = [
     path('deals/<uuid:deal_pk>/files/', views.DealFileListView.as_view(), name='deal_files'),
     path('deals/<uuid:deal_pk>/files/upload/', views.DealFileUploadView.as_view(), name='file_upload'),
     path('files/<uuid:pk>/delete/', views.DealFileDeleteView.as_view(), name='file_delete'),
+
+    # Schedule management
+    path('deals/<uuid:deal_pk>/schedules/', views.DealScheduleListView.as_view(), name='schedule_list'),
+    path('deals/<uuid:deal_pk>/schedules/add/', views.DealScheduleCreateView.as_view(), name='schedule_add'),
+    path('schedules/<uuid:pk>/edit/', views.DealScheduleUpdateView.as_view(), name='schedule_edit'),
+    path('schedules/<uuid:pk>/delete/', views.DealScheduleDeleteView.as_view(), name='schedule_delete'),
+    path('schedules/<uuid:pk>/complete/', views.DealScheduleCompleteView.as_view(), name='schedule_complete'),
+    path('schedules/<uuid:pk>/status/', views.DealScheduleStatusUpdateView.as_view(), name='schedule_status'),
+
+    # Comment management
+    path('deals/<uuid:deal_pk>/comments/add/', views.DealCommentCreateView.as_view(), name='comment_add'),
+    path('comments/<uuid:pk>/delete/', views.DealCommentDeleteView.as_view(), name='comment_delete'),
 ]

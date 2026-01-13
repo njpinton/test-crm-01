@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
-from .models import Deal, DealFile, DealActivity
+from .models import Deal, DealFile, DealActivity, DealSchedule, DealComment
 
 
 class DealFileInline(admin.TabularInline):
@@ -32,6 +32,23 @@ class DealActivityInline(admin.TabularInline):
         return False
 
 
+class DealScheduleInline(admin.TabularInline):
+    model = DealSchedule
+    extra = 0
+    readonly_fields = ['created_at', 'created_by', 'completed_at']
+    fields = [
+        'title', 'event_type', 'scheduled_date', 'scheduled_time',
+        'duration_hours', 'status', 'assigned_to', 'created_at'
+    ]
+
+
+class DealCommentInline(admin.TabularInline):
+    model = DealComment
+    extra = 0
+    readonly_fields = ['author', 'created_at', 'is_edited']
+    fields = ['content', 'author', 'created_at', 'is_edited']
+
+
 @admin.register(Deal)
 class DealAdmin(admin.ModelAdmin):
     list_display = [
@@ -39,7 +56,7 @@ class DealAdmin(admin.ModelAdmin):
         'estimated_value_display', 'probability',
         'expected_close_date', 'days_in_stage_display', 'created_at'
     ]
-    list_filter = ['stage', 'owner', 'estimator', 'created_at', 'expected_close_date']
+    list_filter = ['stage', 'owner', 'estimator', 'site_officer', 'project_manager', 'created_at', 'expected_close_date']
     search_fields = ['title', 'description', 'client__company_name']
     ordering = ['-created_at']
     date_hierarchy = 'created_at'
@@ -73,7 +90,7 @@ class DealAdmin(admin.ModelAdmin):
             )
         }),
         ('Assignment', {
-            'fields': ('owner', 'estimator', 'created_by')
+            'fields': ('owner', 'project_manager', 'site_officer', 'estimator', 'created_by')
         }),
         ('Metadata', {
             'fields': ('position', 'created_at', 'updated_at'),
@@ -81,7 +98,7 @@ class DealAdmin(admin.ModelAdmin):
         }),
     )
 
-    inlines = [DealFileInline, DealActivityInline]
+    inlines = [DealScheduleInline, DealCommentInline, DealFileInline, DealActivityInline]
 
     def client_link(self, obj):
         url = reverse('admin:clients_client_change', args=[obj.client.pk])
@@ -170,3 +187,98 @@ class DealActivityAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(DealSchedule)
+class DealScheduleAdmin(admin.ModelAdmin):
+    list_display = [
+        'title', 'deal_link', 'event_type', 'scheduled_date',
+        'scheduled_time', 'status', 'assigned_to', 'created_at'
+    ]
+    list_filter = ['status', 'event_type', 'scheduled_date', 'assigned_to', 'is_recurring']
+    search_fields = ['title', 'description', 'deal__title', 'deal__client__company_name']
+    ordering = ['-scheduled_date', '-scheduled_time']
+    date_hierarchy = 'scheduled_date'
+    list_per_page = 25
+
+    readonly_fields = ['id', 'created_at', 'updated_at', 'completed_at', 'created_by']
+
+    fieldsets = (
+        (None, {
+            'fields': ('id', 'deal', 'title', 'description')
+        }),
+        ('Event Details', {
+            'fields': (
+                'event_type', 'custom_event_type',
+                'scheduled_date', 'scheduled_time', 'duration_hours',
+                'status', 'assigned_to'
+            )
+        }),
+        ('Location & Equipment', {
+            'fields': ('location_notes', 'access_instructions', 'equipment_needed'),
+            'classes': ('collapse',)
+        }),
+        ('Recurring', {
+            'fields': ('is_recurring', 'recurrence_pattern', 'recurrence_end_date', 'parent_schedule'),
+            'classes': ('collapse',)
+        }),
+        ('Completion', {
+            'fields': ('completed_at', 'completion_notes'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def deal_link(self, obj):
+        url = reverse('admin:pipeline_deal_change', args=[obj.deal.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.deal.title)
+    deal_link.short_description = 'Deal'
+    deal_link.admin_order_field = 'deal__title'
+
+
+@admin.register(DealComment)
+class DealCommentAdmin(admin.ModelAdmin):
+    list_display = [
+        'content_short', 'deal_link', 'author', 'is_reply_display',
+        'created_at', 'is_edited'
+    ]
+    list_filter = ['created_at', 'is_edited', 'author']
+    search_fields = ['content', 'deal__title', 'deal__client__company_name', 'author__email']
+    ordering = ['-created_at']
+    date_hierarchy = 'created_at'
+    list_per_page = 25
+
+    readonly_fields = ['id', 'created_at', 'updated_at', 'is_edited']
+
+    fieldsets = (
+        (None, {
+            'fields': ('id', 'deal', 'content')
+        }),
+        ('Threading', {
+            'fields': ('parent',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('author', 'created_at', 'updated_at', 'is_edited'),
+        }),
+    )
+
+    def deal_link(self, obj):
+        url = reverse('admin:pipeline_deal_change', args=[obj.deal.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.deal.title)
+    deal_link.short_description = 'Deal'
+    deal_link.admin_order_field = 'deal__title'
+
+    def content_short(self, obj):
+        if len(obj.content) > 60:
+            return f"{obj.content[:60]}..."
+        return obj.content
+    content_short.short_description = 'Comment'
+
+    def is_reply_display(self, obj):
+        return obj.is_reply
+    is_reply_display.short_description = 'Is Reply'
+    is_reply_display.boolean = True
