@@ -71,8 +71,15 @@ if 'default' in DATABASES and DATABASES['default'].get('ENGINE') != 'django.db.b
     DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 
-# Static files - WhiteNoise (inherited from base.py)
-# STATIC_URL, STATIC_ROOT, STATICFILES_DIRS already set in base.py
+# Static files configuration for Vercel
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Use simple storage for Vercel (no manifest)
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Disable WhiteNoise's missing directory check
+WHITENOISE_USE_FINDERS = True
 
 
 # Media files - use external storage (GCP, S3, etc.) or Vercel Blob
