@@ -13,10 +13,15 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.vercel')
 def run_migrations():
     """Run pending migrations on first request (cold start)."""
     try:
+        import django
+        django.setup()
         from django.core.management import call_command
-        call_command('migrate', '--noinput', verbosity=0)
+        call_command('migrate', '--noinput', verbosity=1)
+        print("Migrations completed successfully")
     except Exception as e:
-        print(f"Migration warning: {e}")
+        import traceback
+        print(f"Migration error: {e}")
+        traceback.print_exc()
 
 # Run migrations before initializing the app
 run_migrations()
