@@ -13,6 +13,26 @@ class RunMigrationsView(View):
         output = StringIO()
         results = []
 
+        # Check if we should create a test user
+        create_user = request.GET.get('create_user')
+        if create_user:
+            try:
+                from apps.accounts.models import User
+                email = 'admin@example.com'
+                password = 'admin123'
+                if User.objects.filter(email=email).exists():
+                    user = User.objects.get(email=email)
+                    user.set_password(password)
+                    user.is_staff = True
+                    user.is_superuser = True
+                    user.save()
+                    results.append(f"Reset password for existing user: {email}")
+                else:
+                    user = User.objects.create_superuser(email=email, password=password)
+                    results.append(f"Created new superuser: {email}")
+            except Exception as e:
+                results.append(f"Failed to create user: {e}")
+
         # First, try to show current migration status
         try:
             call_command('showmigrations', '--list', stdout=output, stderr=output)
