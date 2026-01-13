@@ -70,13 +70,10 @@ if 'default' in DATABASES and DATABASES['default'].get('ENGINE') != 'django.db.b
     DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
     DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
-    # SSL configuration for Supabase
-    SSL_CERT_PATH = BASE_DIR / 'prod-ca-2021.crt'
-    if SSL_CERT_PATH.exists():
-        DATABASES['default']['OPTIONS'] = {
-            'sslmode': 'verify-full',
-            'sslrootcert': str(SSL_CERT_PATH),
-        }
+    # SSL configuration for Supabase - use require mode for cloud databases
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+    }
 
 
 # Static files configuration for Vercel
